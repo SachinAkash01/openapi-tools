@@ -83,6 +83,7 @@ public class Constants {
     public static final String MEDIA_TYPE = "mediaType";
     public static final String TUPLE = "tuple";
     public static final String REGEX_INTERPOLATION_PATTERN = "^(?!.*\\$\\{).+$";
+    public static final String DATE_CONSTRAINT_ANNOTATION = "constraint:Date";
 
     /**
      * Enum to select the Ballerina Type.
