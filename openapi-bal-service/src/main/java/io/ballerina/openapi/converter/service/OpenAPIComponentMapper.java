@@ -82,6 +82,7 @@ import static io.ballerina.openapi.converter.Constants.FLOAT;
 import static io.ballerina.openapi.converter.Constants.HTTP;
 import static io.ballerina.openapi.converter.Constants.HTTP_CODES;
 import static io.ballerina.openapi.converter.Constants.REGEX_INTERPOLATION_PATTERN;
+import static io.ballerina.openapi.converter.Constants.DATE_CONSTRAINT_ANNOTATION;
 
 /**
  * This util class for processing the mapping in between ballerina record and openAPI object schema.
@@ -832,7 +833,6 @@ public class OpenAPIComponentMapper {
         }
     }
 
-
     /**
      * This util is used to extract the annotation values in `@constraint` and store it in builder.
      */
@@ -843,6 +843,13 @@ public class OpenAPIComponentMapper {
                 .filter(this::isConstraintAnnotation)
                 .filter(annotation -> annotation.annotValue().isPresent())
                 .forEach(annotation -> {
+                    if (isDateConstraint(annotation)) {
+                        DiagnosticMessages errorMsg = DiagnosticMessages.OAS_CONVERTOR_120;
+                        IncompatibleResourceDiagnostic error = new IncompatibleResourceDiagnostic(errorMsg,
+                                annotation.location(), annotation.toString());
+                        diagnostics.add(error);
+                        return;
+                    }
                     MappingConstructorExpressionNode annotationValue = annotation.annotValue().get();
                     annotationValue.fields().stream()
                             .filter(field -> SyntaxKind.SPECIFIC_FIELD.equals(field.kind()))
@@ -861,6 +868,16 @@ public class OpenAPIComponentMapper {
             return qualifiedNameRef.modulePrefix().text().equals("constraint");
         }
         return false;
+    }
+
+    /*
+     * This util is used to check whether an annotation is a constraint:Date annotation.
+     * Currently, we don't have support for mapping Date constraints to OAS hence we skip them.
+     * {@link <a href="https://github.com/ballerina-platform/ballerina-standard-library/issues/5049">...</a>}
+     * Once the above improvement is completed this method should be removed!
+     */
+    private boolean isDateConstraint(AnnotationNode annotation) {
+        return annotation.annotReference().toString().trim().equals(DATE_CONSTRAINT_ANNOTATION);
     }
 
     /**
