@@ -31,18 +31,16 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.openapi.service.mapper.diagnostic.DiagnosticMessages;
 import io.ballerina.openapi.service.mapper.diagnostic.IncompatibleResourceDiagnostic;
 import io.ballerina.openapi.service.mapper.diagnostic.OpenAPIMapperDiagnostic;
-import io.ballerina.openapi.service.mapper.model.ModuleMemberVisitor;
 import io.ballerina.openapi.service.mapper.model.OperationAdaptor;
+import io.ballerina.openapi.service.mapper.parameter.ParameterMapper;
 import io.ballerina.openapi.service.mapper.parameter.ResponseMapper;
 import io.ballerina.openapi.service.mapper.type.TypeMapper;
 import io.ballerina.openapi.service.mapper.utils.MapperCommonUtils;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
-import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
-import io.swagger.v3.oas.models.responses.ApiResponses;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,26 +61,25 @@ import static io.ballerina.openapi.service.mapper.utils.MapperCommonUtils.getOpe
  */
 public class OpenAPIResourceMapper {
     private final SemanticModel semanticModel;
-    private final ModuleMemberVisitor moduleMemberVisitor;
     private final Paths pathObject = new Paths();
-    private final Components components = new Components();
     private final List<OpenAPIMapperDiagnostic> errors;
     private final TypeMapper typeMapper;
     private final OpenAPI openAPI;
     private final List<FunctionDefinitionNode> resources;
+    private final boolean treatNilableAsOptional;
 
     /**
      * Initializes a resource parser for openApi.
      */
     OpenAPIResourceMapper(OpenAPI openAPI, List<FunctionDefinitionNode> resources, SemanticModel semanticModel,
-                          ModuleMemberVisitor moduleMemberVisitor, List<OpenAPIMapperDiagnostic> errors,
-                          TypeMapper typeMapper) {
+                          List<OpenAPIMapperDiagnostic> errors,
+                          TypeMapper typeMapper, boolean treatNilableAsOptional) {
         this.openAPI = openAPI;
         this.resources = resources;
         this.semanticModel = semanticModel;
         this.errors = errors;
-        this.moduleMemberVisitor = moduleMemberVisitor;
         this.typeMapper = typeMapper;
+        this.treatNilableAsOptional = treatNilableAsOptional;
     }
 
     public void addMapping() {
@@ -201,7 +198,7 @@ public class OpenAPIResourceMapper {
         op.setPath(generateRelativePath);
         /* Set operation id */
         String resName = (resource.functionName().text() + "_" +
-                generateRelativePath).replaceAll("\\{///\\}", "_");
+                generateRelativePath).replaceAll("\\{///}", "_");
 
         if (generateRelativePath.equals("/")) {
             resName = resource.functionName().text();
@@ -212,9 +209,9 @@ public class OpenAPIResourceMapper {
         // Map API documentation
         Map<String, String> apiDocs = listAPIDocumentations(resource, op);
         //Add path parameters if in path and query parameters
-        OpenAPIParameterMapper openAPIParameterMapper = new OpenAPIParameterMapper(resource, op, apiDocs, semanticModel,
-                moduleMemberVisitor, errors, typeMapper, openAPI);
-        openAPIParameterMapper.getResourceInputs(components, semanticModel);
+        ParameterMapper parameterMapper = new ParameterMapper(resource, op, apiDocs, semanticModel,
+                treatNilableAsOptional, typeMapper, openAPI);
+        parameterMapper.setParameters();
         if (errors.size() > 1 || (errors.size() == 1 && !errors.get(0).getCode().equals(DiagnosticMessages
                 .OAS_CONVERTOR_113.getCode()))) {
             boolean isErrorIncluded = errors.stream().anyMatch(d ->
@@ -224,19 +221,17 @@ public class OpenAPIResourceMapper {
             }
         }
 
-        if (checkRestParamInResourcePath(openAPIParameterMapper)) {
+        if (checkRestParamInResourcePath(parameterMapper)) {
             return Optional.empty();
         }
-        errors.addAll(openAPIParameterMapper.getDiagnostics());
-        ResponseMapper responseMapper = new ResponseMapper(semanticModel, openAPI, resource, op,
-                errors, moduleMemberVisitor);
-        ApiResponses apiResponses = responseMapper.getApiResponses();
-        op.getOperation().setResponses(apiResponses);
+        errors.addAll(parameterMapper.getDiagnostics());
+        ResponseMapper responseMapper = new ResponseMapper(semanticModel, openAPI, resource, op, typeMapper);
+        responseMapper.setApiResponses();
         return Optional.of(op);
     }
 
-    private boolean checkRestParamInResourcePath(OpenAPIParameterMapper openAPIParameterMapper) {
-        List<OpenAPIMapperDiagnostic> errorList = openAPIParameterMapper.getDiagnostics();
+    private boolean checkRestParamInResourcePath(ParameterMapper parameterMapper) {
+        List<OpenAPIMapperDiagnostic> errorList = parameterMapper.getDiagnostics();
         if (!errorList.isEmpty() && errorList.stream().anyMatch(error ->
                 DiagnosticMessages.OAS_CONVERTOR_125.getCode().equals(error.getCode()))) {
             errors.addAll(errorList);

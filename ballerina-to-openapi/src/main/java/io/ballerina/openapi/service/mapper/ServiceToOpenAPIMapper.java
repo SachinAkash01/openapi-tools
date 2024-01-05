@@ -214,14 +214,14 @@ public class ServiceToOpenAPIMapper {
             OpenAPI openapi = oasResult.getOpenAPI().get();
             if (openapi.getPaths() == null) {
                 // Take base path of service
-                OpenAPIServiceMapper openAPIServiceMapper = new OpenAPIServiceMapper(semanticModel,
-                        moduleMemberVisitor);
+                OpenAPIServiceMapper openAPIServiceMapper = new OpenAPIServiceMapper(serviceDefinition, openapi,
+                        semanticModel, moduleMemberVisitor);
                 // 02. Filter and set the ServerURLs according to endpoints. Complete the server section in OAS
                 openapi = OpenAPIEndpointMapper.ENDPOINT_MAPPER.getServers(openapi, listeners, serviceDefinition);
                 // 03. Filter path and component sections in OAS.
                 // Generate openApi string for the mentioned service name.
-                openapi = openAPIServiceMapper.convertServiceToOpenAPI(serviceDefinition, openapi);
-                return new OASResult(openapi, openAPIServiceMapper.getErrors());
+                openAPIServiceMapper.convertServiceToOpenAPI();
+                return new OASResult(openapi, openAPIServiceMapper.getDiagnostics());
             } else {
                 return new OASResult(openapi, oasResult.getDiagnostics());
             }
@@ -460,19 +460,22 @@ public class ServiceToOpenAPIMapper {
             ExceptionDiagnostic diagnostic = new ExceptionDiagnostic(error.getCode(),
                     error.getDescription(), location);
             diagnostics.add(diagnostic);
-        } else if (Paths.get(openapiPath.toString()).isAbsolute()) {
-            relativePath = Paths.get(openapiPath.toString());
         } else {
-            File file = new File(ballerinaFilePath.toString());
-            File parentFolder = new File(file.getParent());
-            File openapiContract = new File(parentFolder, openapiPath.toString());
-            try {
-                relativePath = Paths.get(openapiContract.getCanonicalPath());
-            } catch (IOException e) {
-                DiagnosticMessages error = DiagnosticMessages.OAS_CONVERTOR_108;
-                ExceptionDiagnostic diagnostic = new ExceptionDiagnostic(error.getCode()
-                        , error.getDescription(), location, e.toString());
-                diagnostics.add(diagnostic);
+            Path path = Paths.get(openapiPath.toString());
+            if (path.isAbsolute()) {
+                relativePath = path;
+            } else {
+                File file = new File(ballerinaFilePath.toString());
+                File parentFolder = new File(file.getParent());
+                File openapiContract = new File(parentFolder, openapiPath.toString());
+                try {
+                    relativePath = Paths.get(openapiContract.getCanonicalPath());
+                } catch (IOException e) {
+                    DiagnosticMessages error = DiagnosticMessages.OAS_CONVERTOR_108;
+                    ExceptionDiagnostic diagnostic = new ExceptionDiagnostic(error.getCode()
+                            , error.getDescription(), location, e.toString());
+                    diagnostics.add(diagnostic);
+                }
             }
         }
         if (relativePath != null && Files.exists(relativePath)) {

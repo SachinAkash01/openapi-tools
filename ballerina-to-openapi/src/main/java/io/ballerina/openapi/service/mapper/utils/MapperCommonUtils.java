@@ -34,33 +34,26 @@ import io.ballerina.compiler.api.symbols.TypeDescKind;
 import io.ballerina.compiler.api.symbols.TypeReferenceTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
-import io.ballerina.compiler.syntax.tree.AbstractNodeFactory;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ExpressionNode;
-import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingFieldNode;
-import io.ballerina.compiler.syntax.tree.MetadataNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
-import io.ballerina.compiler.syntax.tree.NonTerminalNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
 import io.ballerina.compiler.syntax.tree.ResourcePathParameterNode;
 import io.ballerina.compiler.syntax.tree.SeparatedNodeList;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
-import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.openapi.service.mapper.Constants;
 import io.ballerina.openapi.service.mapper.diagnostic.DiagnosticMessages;
 import io.ballerina.openapi.service.mapper.diagnostic.ExceptionDiagnostic;
 import io.ballerina.openapi.service.mapper.diagnostic.OpenAPIMapperDiagnostic;
-import io.ballerina.openapi.service.mapper.model.ModuleMemberVisitor;
 import io.ballerina.openapi.service.mapper.model.OASResult;
-import io.ballerina.openapi.service.mapper.type.TypeMapper;
 import io.ballerina.runtime.api.utils.IdentifierUtils;
 import io.ballerina.tools.diagnostics.Diagnostic;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
@@ -70,13 +63,7 @@ import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.media.ArraySchema;
-import io.swagger.v3.oas.models.media.BooleanSchema;
-import io.swagger.v3.oas.models.media.IntegerSchema;
-import io.swagger.v3.oas.models.media.NumberSchema;
-import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
@@ -318,8 +305,7 @@ public class MapperCommonUtils {
                         }
                         mediaTypes.add(((BasicLiteralNode) mime).literalToken().text().trim().replaceAll("\"", ""));
                     }
-                } else if (expressionNode instanceof QualifiedNameReferenceNode && semanticModel != null) {
-                    QualifiedNameReferenceNode moduleRef = (QualifiedNameReferenceNode) expressionNode;
+                } else if (expressionNode instanceof QualifiedNameReferenceNode moduleRef && semanticModel != null) {
                     Optional<Symbol> refSymbol = semanticModel.symbol(moduleRef);
                     if (refSymbol.isPresent() && (refSymbol.get().kind() == SymbolKind.CONSTANT)
                             && ((ConstantSymbol) refSymbol.get()).resolvedValue().isPresent()) {
@@ -332,45 +318,6 @@ public class MapperCommonUtils {
             }
         }
         return mediaTypes;
-    }
-
-    /**
-     * This function uses to take the service declaration node from given required node and return all the annotation
-     * nodes that attached to service node.
-     */
-    public static NodeList<AnnotationNode> getAnnotationNodesFromServiceNode(RequiredParameterNode headerParam) {
-        NodeList<AnnotationNode> annotations = AbstractNodeFactory.createEmptyNodeList();
-        NonTerminalNode parent = headerParam.parent();
-        while (parent.kind() != SyntaxKind.SERVICE_DECLARATION) {
-            parent = parent.parent();
-        }
-        ServiceDeclarationNode serviceNode = (ServiceDeclarationNode) parent;
-        if (serviceNode.metadata().isPresent()) {
-            MetadataNode metadataNode = serviceNode.metadata().get();
-            annotations = metadataNode.annotations();
-        }
-        return annotations;
-    }
-
-    /**
-     * This function for taking the specific media-type subtype prefix from http service configuration annotation.
-     * <pre>
-     *     @http:ServiceConfig {
-     *          mediaTypeSubtypePrefix : "vnd.exm.sales"
-     *  }
-     * </pre>
-     */
-    public static Optional<String> extractCustomMediaType(FunctionDefinitionNode functionDefNode) {
-        ServiceDeclarationNode serviceDefNode = (ServiceDeclarationNode) functionDefNode.parent();
-        if (serviceDefNode.metadata().isPresent()) {
-            MetadataNode metadataNode = serviceDefNode.metadata().get();
-            NodeList<AnnotationNode> annotations = metadataNode.annotations();
-            if (!annotations.isEmpty()) {
-                return MapperCommonUtils.extractServiceAnnotationDetails(annotations,
-                        "http:ServiceConfig", "mediaTypeSubtypePrefix");
-            }
-        }
-        return Optional.empty();
     }
 
     /**
@@ -565,17 +512,8 @@ public class MapperCommonUtils {
         return unescapedParamName.replaceAll("\\\\", "").replaceAll("'", "");
     }
 
-    public static Schema<?> handleReference(SemanticModel semanticModel, SimpleNameReferenceNode recordNode,
-                                            ModuleMemberVisitor moduleMemberVisitor, TypeMapper typeMapper) {
-        Schema<?> refSchema = new Schema<>();
-        // Creating request body - required.
-        Optional<Symbol> symbol = semanticModel.symbol(recordNode);
-        if (symbol.isPresent() && symbol.get() instanceof TypeSymbol) {
-            String recordName = recordNode.name().toString().trim();
-            typeMapper.addMapping((TypeSymbol) symbol.get());
-            refSchema.set$ref(MapperCommonUtils.unescapeIdentifier(recordName));
-        }
-        return refSchema;
+    public static String removeStartingSingleQuote(String parameterName) {
+        return parameterName.replaceAll("^'", "");
     }
 
     public static String getTypeDescription(TypeReferenceTypeSymbol typeSymbol) {
@@ -602,19 +540,6 @@ public class MapperCommonUtils {
         return unescapeIdentifier(typeName);
     }
 
-    public static Schema setDefaultValue(Schema schema, String defaultValue) {
-        if (Objects.isNull(schema) || Objects.isNull(defaultValue)) {
-            return schema;
-        }
-        if (!Objects.isNull(schema.get$ref())) {
-            Schema<?> compoundSchema = new Schema<>();
-            compoundSchema.addAllOfItem(schema);
-            schema = compoundSchema;
-        }
-        schema.setDefault(parseBalSimpleLiteral(defaultValue));
-        return schema;
-    }
-
     public static Object parseBalSimpleLiteral(String literal) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -625,8 +550,8 @@ public class MapperCommonUtils {
         }
     }
 
-    public static boolean isSimpleValueLiteralKind(SyntaxKind valueExpressionKind) {
-        return Arrays.stream(validExpressionKind).anyMatch(syntaxKind -> syntaxKind ==
+    public static boolean isNotSimpleValueLiteralKind(SyntaxKind valueExpressionKind) {
+        return Arrays.stream(validExpressionKind).noneMatch(syntaxKind -> syntaxKind ==
                 valueExpressionKind);
     }
 
