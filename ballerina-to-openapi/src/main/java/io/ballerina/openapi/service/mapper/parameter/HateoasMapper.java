@@ -26,39 +26,33 @@ import java.util.Optional;
 import java.util.HashMap;
 
 import io.swagger.v3.oas.models.links.Link;
-import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.MetadataNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.NodeList;
-import io.ballerina.openapi.service.mapper.hateoas.ContextHolder;
 import io.ballerina.openapi.service.mapper.hateoas.Resource;
 import io.ballerina.openapi.service.mapper.parameter.model.HateoasLink;
 
+import static io.ballerina.openapi.service.mapper.hateoas.ContextHolder.getHateoasContextHolder;
+
 public class HateoasMapper {
-    Map<String, Link> hateoasLinks;
-    public HateoasMapper() {
 
-    }
-
-    public Map<String, Link> mapHateoasLinks(int serviceId, FunctionDefinitionNode resourceFunction,
-                                                       ApiResponse apiResponse) {
+    public Map<String, Link> mapHateoasLinksToSwaggerLinks(int serviceId, FunctionDefinitionNode resourceFunction) {
         Optional<String> linkedTo = getResourceConfigAnnotation(resourceFunction)
                 .flatMap(resourceConfig -> getValueForAnnotationFields(resourceConfig, "linkedTo"));
         if (linkedTo.isEmpty()) {
             return Collections.emptyMap();
         }
         List<HateoasLink> links = getLinks(linkedTo.get());
-        ContextHolder contextHolder = new ContextHolder();
-        Link swaggerLink = new Link();
+        Map<String, Link> hateoasLinks = new HashMap<>();
         for (HateoasLink link : links) {
-            Optional<Resource> resource = contextHolder.getHateoasResource(serviceId, link.getResourceName(),
-                    link.getResourceMethod());
+            Optional<Resource> resource = getHateoasContextHolder()
+                    .getHateoasResource(serviceId, link.getResourceName(), link.getResourceMethod());
             if (resource.isPresent()) {
-                String operationId = resource.get().operationId();
-                swaggerLink.setOperationId(operationId);
+                Link swaggerLink = new Link();
+                swaggerLink.setOperationId(resource.get().operationId());
                 hateoasLinks.put(link.getRel(), swaggerLink);
             }
         }
