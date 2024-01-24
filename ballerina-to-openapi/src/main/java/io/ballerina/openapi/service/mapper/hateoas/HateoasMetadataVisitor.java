@@ -21,10 +21,14 @@ package io.ballerina.openapi.service.mapper.hateoas;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.ServiceDeclarationSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
+import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
+import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
+import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
+import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.openapi.service.mapper.utils.MapperCommonUtils;
 
@@ -65,16 +69,42 @@ public class HateoasMetadataVisitor extends NodeVisitor {
                 FunctionDefinitionNode resourceFunction = (FunctionDefinitionNode) child;
                 String resourceMethod = resourceFunction.functionName().text();
                 String operationId = MapperCommonUtils.getOperationId(resourceFunction);
-                Optional<String> resourceName = getResourceConfigAnnotation(resourceFunction)
+                Optional<ExpressionNode> resourceName = getResourceConfigAnnotation(resourceFunction)
                         .flatMap(resourceConfig -> getValueForAnnotationFields(resourceConfig, "name"));
                 if (resourceName.isEmpty()) {
                     return;
                 }
-                String cleanedResourceName = resourceName.get().replaceAll("\"", "");
+                if (!resourceName.get().kind().equals(SyntaxKind.STRING_LITERAL)) {
+                    break;
+                }
+                String cleanedResourceName = resourceName.get().toString().trim().replaceAll("\"", "");
                 Resource hateoasResource = new Resource(resourceMethod, operationId);
                 getHateoasContextHolder().updateHateoasResource(
                         packageId, serviceId, cleanedResourceName, hateoasResource);
             }
         }
+    }
+
+    @Override
+    public void visit(MappingConstructorExpressionNode mappingConstructorExpressionNode) {
+        mappingConstructorExpressionNode.children().forEach(child -> {
+            if (child.kind().equals(SyntaxKind.SPECIFIC_FIELD)) {
+                child.accept(this);
+            }
+        });
+    }
+
+    @Override
+    public void visit(SpecificFieldNode specificFieldNode) {
+        specificFieldNode.children().forEach(child -> {
+            if (child.kind().equals(SyntaxKind.STRING_LITERAL)) {
+
+            }
+        });
+    }
+
+    @Override
+    public void visit(BasicLiteralNode basicLiteralNode) {
+        basicLiteralNode.children().get(0);
     }
 }

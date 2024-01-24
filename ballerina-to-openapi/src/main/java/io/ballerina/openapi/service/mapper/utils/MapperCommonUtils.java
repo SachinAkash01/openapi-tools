@@ -466,7 +466,7 @@ public class MapperCommonUtils {
                 .findFirst();
     }
 
-    public static Optional<String> getValueForAnnotationFields(AnnotationNode resourceConfigAnnotation,
+    public static Optional<ExpressionNode> getValueForAnnotationFields(AnnotationNode resourceConfigAnnotation,
                                                                String fieldName) {
         return resourceConfigAnnotation
                 .annotValue()
@@ -477,7 +477,6 @@ public class MapperCommonUtils {
                                 .map(fld -> (SpecificFieldNode) fld)
                                 .filter(fld -> fieldName.equals(fld.fieldName().toString().trim()))
                                 .findFirst()
-                ).flatMap(SpecificFieldNode::valueExpr)
-                .map(en -> en.toString().trim());
+                ).flatMap(SpecificFieldNode::valueExpr);
     }
 }

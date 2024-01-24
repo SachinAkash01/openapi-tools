@@ -21,6 +21,7 @@ package io.ballerina.openapi.service.mapper.hateoas;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.ServiceDeclarationSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
+import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
@@ -136,7 +137,7 @@ public class HateoasMapperImpl implements HateoasMapper {
 
     private Map<String, Link> mapHateoasLinksToOpenApiLinks(String packageId, int serviceId,
                                                             FunctionDefinitionNode resourceFunction) {
-        Optional<String> linkedTo = getResourceConfigAnnotation(resourceFunction)
+        Optional<ExpressionNode> linkedTo = getResourceConfigAnnotation(resourceFunction)
                 .flatMap(resourceConfig -> getValueForAnnotationFields(resourceConfig, BALLERINA_LINKEDTO_KEYWORD));
         if (linkedTo.isEmpty()) {
             return Collections.emptyMap();
@@ -157,13 +158,19 @@ public class HateoasMapperImpl implements HateoasMapper {
         return hateoasLinks;
     }
 
-    private List<HateoasLink> getLinks(String linkedTo) {
+    private List<HateoasLink> getLinks(ExpressionNode linkedTo) {
         List<HateoasLink> links = new ArrayList<>();
-        String[] linkArray = linkedTo.replaceAll("[\\[\\]]", "").split("\\},\\s*");
-        for (String linkString : linkArray) {
-            HateoasLink link = parseHateoasLink(linkString);
-            links.add(link);
-        }
+        linkedTo.children().forEach(child -> {
+            if (child.kind().equals(SyntaxKind.MAPPING_CONSTRUCTOR)) {
+                HateoasMetadataVisitor hateoasMetadataVisitor = new HateoasMetadataVisitor(packageId, semanticModel);
+                child.accept(hateoasMetadataVisitor);
+            }
+        });
+//        String[] linkArray = linkedTo.replaceAll("[\\[\\]]", "").split("\\},\\s*");
+//        for (String linkString : linkArray) {
+//            HateoasLink link = parseHateoasLink(linkString);
+//            links.add(link);
+//        }
         return links;
     }
 
