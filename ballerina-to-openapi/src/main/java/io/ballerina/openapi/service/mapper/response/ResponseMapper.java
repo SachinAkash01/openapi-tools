@@ -17,8 +17,6 @@
  */
 package io.ballerina.openapi.service.mapper.response;
 
-import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
-
 /**
  * This {@link ResponseMapper} represents the interface for response mapper.
  *
@@ -27,6 +25,4 @@ import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 public interface ResponseMapper {
 
     void setApiResponses();
-
-    void initializeResponseMapper(FunctionDefinitionNode resourceNode);
 }
