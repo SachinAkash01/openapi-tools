@@ -18,11 +18,10 @@
 package io.ballerina.openapi.service.mapper.response;
 
 import io.ballerina.compiler.api.SemanticModel;
-import io.ballerina.compiler.api.symbols.ResourceMethodSymbol;
+import io.ballerina.compiler.api.symbols.*;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
-import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.openapi.service.mapper.model.AdditionalData;
@@ -54,7 +53,7 @@ public class InterceptableResponseMapperImpl implements ResponseMapper {
         this.serviceNode = serviceNode;
         this.components = components;
         this.additionalData = additionalData;
-        initializeResponseMapper(resource);
+        initializeInterceptableResponseMapper(resource);
     }
 
     // Find out a given service is an interceptable service
@@ -65,12 +64,11 @@ public class InterceptableResponseMapperImpl implements ResponseMapper {
     //      - call the default response mapper
 
     @Override
-    public void setApiResponses() {
+    public void setApiResponses(OperationInventory operationInventory, FunctionDefinitionNode resource) {
         operationInventory.setApiResponses(apiResponses);
     }
 
-    @Override
-    public void initializeResponseMapper(FunctionDefinitionNode resource) {
+    public void initializeInterceptableResponseMapper(FunctionDefinitionNode resource) {
         if (isInterceptable()) {
             Optional<FunctionDefinitionNode> interceptorFunction = findCreateInterceptorsFunction(serviceNode.members());
             if (supportsTupleType(interceptorFunction.get())) {
@@ -78,7 +76,7 @@ public class InterceptableResponseMapperImpl implements ResponseMapper {
                 effectiveInterceptorReturnTypes(resource);
             }
         } else {
-            new ResponseMapperImpl(resource, operationInventory, components, additionalData);
+            return;
         }
     }
 
@@ -117,9 +115,9 @@ public class InterceptableResponseMapperImpl implements ResponseMapper {
 
     // todo: implement this method properly
     private List<Interceptor> getInterceptorPipeline(FunctionDefinitionNode resource) {
-        Object returnInterceptors = resource.functionSignature()
-                .returnTypeDesc()
-                .map(ReturnTypeDescriptorNode::type).get();
+        TypeReferenceTypeSymbol interceptorType = ((TypeReferenceTypeSymbol)((ClassSymbol)((TypeReferenceTypeSymbol)((TupleTypeSymbol)((MethodSymbol)
+                (semanticModel.symbol(resource).get())).typeDescriptor().returnTypeDescriptor().get())
+                .memberTypeDescriptors().get(0)).typeDescriptor()).typeInclusions().get(0));
         return List.of();
     }
 
